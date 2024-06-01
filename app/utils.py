@@ -5,29 +5,37 @@ import json
 import logging
 import os
 from collections import deque
+from dotenv import load_dotenv
 
 import requests
 from flask import Response, jsonify
 
-from app.config import configure_logging
+from app.config import configure_logging, get_env_value
 
 configure_logging()
 current_token_index = 0
 
+# 从环境变量读取代理设置（支持大小写）
+http_proxy = get_env_value('HTTP_PROXY')
+https_proxy = get_env_value('HTTPS_PROXY')
+
+proxies = {}
+if http_proxy:
+    proxies['http'] = http_proxy
+if https_proxy:
+    proxies['https'] = https_proxy
+
+# 如果没有任何代理，则设置为 None
+proxies = proxies if proxies else None
 
 def send_http_request(url, headers, data):
     try:
-        response = requests.post(url, headers=headers, json=data)
+        response = requests.post(url, headers=headers, json=data, proxies=proxies)
         response.raise_for_status()
         return response
     except requests.exceptions.RequestException as e:
         logging.error("HTTP request error: %s", e)
         raise
-
-
-def get_env_variable(var_name):
-    return os.getenv(var_name)
-
 
 def send_chat_message(req, auth_token, channel_id, final_user_content, model_name, user_stream, image_url):
     logging.info("Channel ID: %s", channel_id)
@@ -79,7 +87,7 @@ def send_chat_message(req, auth_token, channel_id, final_user_content, model_nam
     }
 
     try:
-        response = requests.post(url, headers=headers, json=data, stream=True)
+        response = requests.post(url, headers=headers, json=data, stream=True, proxies=proxies)
         if response.headers.get('Content-Type') == 'text/event-stream;charset=UTF-8':
             if not user_stream:
                 return stream_2_json(response, model_name)
@@ -201,7 +209,7 @@ def upload_image_to_telegraph(base64_string):
 
         mime_type = f"image/{image_type}"
         files = {'file': (f'image.{image_type}', image_data, mime_type)}
-        response = requests.post('https://telegra.ph/upload', files=files)
+        response = requests.post('https://telegra.ph/upload', files=files, proxies=proxies)
 
         response.raise_for_status()
         json_response = response.json()
@@ -305,7 +313,7 @@ def fetch_channel_id(auth_token, model_name, content, template_id):
     }
 
     try:
-        response = requests.post(url, headers=headers, json=data)
+        response = requests.post(url, headers=headers, json=data, proxies=proxies)
         response.raise_for_status()
         response_data = response.json()
         return response_data.get('data', {}).get('channelId')

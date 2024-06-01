@@ -1,6 +1,7 @@
 import logging
 import os
 from datetime import datetime, timedelta
+import json
 
 from flask import request, Response, current_app as app
 
@@ -10,7 +11,47 @@ from app.utils import send_chat_message, fetch_channel_id, map_model_name, proce
     generate_hash, get_next_auth_token, handle_error, get_request_parameters
 
 configure_logging()
-storage_map = {}
+
+
+# 从文件初始化 storage_map
+def load_storage_map():
+    try:
+        with open('storage_map.json', 'r') as file:
+            return json.load(file, object_hook=json_datetime_parser)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+# 保存 storage_map 到文件
+def save_storage_map():
+    try:
+        with open('storage_map.json', 'w') as file:
+            json.dump(storage_map, file, default=json_datetime_converter)
+    except IOError as e:
+        logging.error("Failed to save storage map to file: {}".format(e))
+    except TypeError as e:
+        logging.error("Type error during serialization: {}".format(e))
+
+# 辅助函数，将 JSON 对象转换为 datetime
+def json_datetime_parser(dct):
+    new_dct = {}
+    for key, value in dct.items():
+        if isinstance(value, list) and len(value) == 2:
+            channel_id, expiry_str = value
+            try:
+                expiry_time = datetime.strptime(expiry_str, '%Y-%m-%dT%H:%M:%S.%f')
+                new_dct[key] = (channel_id, expiry_time)
+            except ValueError as e:
+                logging.error(f"Error parsing date: {expiry_str} with error {e}")
+    return new_dct
+
+# 辅助函数，将 datetime 转换为 JSON 可序列化格式
+def json_datetime_converter(obj):
+    if isinstance(obj, datetime):
+        return obj.strftime('%Y-%m-%dT%H:%M:%S.%f')
+    raise TypeError("Type %s not serializable" % type(obj))
+
+# 程序启动时加载 storage_map
+storage_map = load_storage_map()
 
 
 @app.route("/v1/chat/completions", methods=["GET", "POST", "OPTIONS"])
@@ -44,6 +85,7 @@ def get_channel_id(hash_value, token, model_name, content, template_id):
     channel_id = fetch_channel_id(token, model_name, content, template_id)
     expiry_time = datetime.now() + timedelta(days=1)
     storage_map[hash_value] = (channel_id, expiry_time)
+    save_storage_map()  # 保存更新到文件
     return channel_id
 
 
