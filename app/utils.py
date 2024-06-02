@@ -111,7 +111,7 @@ def stream_response(resp, model_name):
             content = message.get("content", "")
             wrapped_chunk = {
                 "id": message_id,
-                "object": objectid,
+                "object": "chat.completion",
                 "created": 0,
                 "model": model_name,
                 "choices": [
@@ -152,13 +152,13 @@ def stream_2_json(resp, model_name):
 
         wrapped_chunk = {
             "id": message_id,
-            "object": objectid,
+            "object": "chat.completion",
             "created": 0,
             "model": model_name,
             "choices": [
                 {
                     "index": 0,
-                    "delta": {
+                    "message": {
                         "role": "assistant",
                         "content": merged_content
                     },
