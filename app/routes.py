@@ -8,7 +8,7 @@ from flask import request, Response, current_app as app
 from app.config import IGNORED_MODEL_NAMES, IMAGE_MODEL_NAMES, AUTH_TOKEN, HISTORY_MSG_LIMIT
 from app.config import configure_logging, get_env_value
 from app.utils import send_chat_message, fetch_channel_id, map_model_name, process_content, get_user_contents, \
-    generate_hash, get_next_auth_token, handle_error, get_request_parameters
+    generate_hash, get_next_auth_token, handle_error, get_request_parameters, get_topic_from_headers
 
 configure_logging()
 
@@ -106,10 +106,17 @@ def fetch(req):
         channel_id = get_env_value("CHAT_CHANNEL_ID")
     elif messages:
         last_message = messages[-1]
-        first_user_message, end_user_message, concatenated_messages = get_user_contents(messages, HISTORY_MSG_LIMIT)
-        final_user_content, image_url = process_content(last_message.get('content'))
+        first_user_message, end_user_message, concatenated_messages, user_messages_list = get_user_contents(messages, HISTORY_MSG_LIMIT)
+        final_user_content = user_messages_list[-1]
+        user_text, image_url = process_content(last_message.get('content'))
         final_user_content = concatenated_messages + '\n' + final_user_content if concatenated_messages else final_user_content
-        hash_value = generate_hash(first_user_message, model_to_use, token)
+
+        topic = get_topic_from_headers(req.headers)
+        if topic is not None and len(topic) > 0:
+            first_argument = topic
+        else:
+            first_argument = first_user_message
+        hash_value = generate_hash(first_argument, model_to_use, token)
         channel_id = get_channel_id(hash_value, token, model_to_use, final_user_content, template_id)
 
     if final_user_content is None:
