@@ -257,7 +257,7 @@ def get_user_contents(messages, limit):
                     if system_content is None:
                         first_user_message = content
                     else:
-                        first_user_message = f"Your Role: {system_content}\n\nUser's input: {content}"
+                        first_user_message = f"Your role setting: {system_content}\n\nUser's input: {content}"
                     selected_messages.append(first_user_message)
                     user_messages_list.append(first_user_message)
                 else:
