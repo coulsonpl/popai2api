@@ -41,6 +41,12 @@ class ProxyPool:
             proxy['http'] = random.choice(self.http_proxies)
         if self.https_proxies:
             proxy['https'] = random.choice(self.https_proxies)
-        logging.info("proxy URL %s", proxy)
+        
+        # 若只存在一个键，使用其值填充另一个
+        if 'http' in proxy or 'https' in proxy:
+            proxy.setdefault('http', proxy.get('https'))
+            proxy.setdefault('https', proxy.get('http'))
+    
+        # logging.info("proxy URL %s", proxy)
 
         return proxy if proxy else None
